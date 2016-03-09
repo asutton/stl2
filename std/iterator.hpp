@@ -1,6 +1,6 @@
 
-#ifndef STL_UTILITY_HPP
-#define STL_UTILITY_HPP
+#ifndef STL_ITERATOR_HPP
+#define STL_ITERATOR_HPP
 
 #include "concepts.hpp"
 #include "functional.hpp" // for mem_fn
@@ -16,14 +16,14 @@ template<typename T>
 concept bool has_nested_value_type()
 {
   return requires { typename T::value_type; }
-      && Object<typename T::value_type>;
+      && Object<typename T::value_type>();
 }
 
 template<typename T>
 concept bool has_nested_element_type()
 {
   return requires { typename T::element_type; }
-      && Object<typename T::element_type>;
+      && Object<typename T::element_type>();
 }
 
 
@@ -154,7 +154,7 @@ concept bool WeaklyIncrementable()
 {
   return Semiregular<I>() && requires (I i) {
     typename difference_type_t<I>;
-    requires SignedIntegral<difference_type_t<I>>;
+    requires SignedIntegral<difference_type_t<I>>();
     { ++i } -> SameAs<I&>;
     i++;
   };
@@ -548,7 +548,6 @@ struct reverse_iterator
   using iterator_type     = I;
   using value_type        = value_type_t<I>;
   using reference         = reference_t<I>;
-  using pointer           = pointer_t<I>;
   using difference_type   = difference_type_t<I>;
   using iterator_category = iterator_category_t<I>;
 
@@ -562,7 +561,7 @@ struct reverse_iterator
 
   I base() const { return iter; }
   reference operator*() const;
-  pointer   operator->() const;
+  I operator->() const { return prev(iter); }
 
   reverse_iterator& operator++();
   reverse_iterator& operator--();
@@ -585,13 +584,6 @@ inline auto
 reverse_iterator<I>::operator*() const -> reference
 {
   return *prev(iter);
-}
-
-template<BidirectionalIterator I>
-inline auto
-reverse_iterator<I>::operator->() const -> pointer
-{
-  return &(operator*());
 }
 
 template<BidirectionalIterator I>
@@ -941,6 +933,161 @@ front_inserter(C& c)
 {
   return front_insert_iterator<C>(c);
 }
+
+
+// Move iterator
+
+template<InputIterator I>
+struct move_iterator
+{
+  using iterator_type     = I;
+  using value_type        = value_type_t<I>;
+  using reference         = remove_reference_t<reference_t<I>>;
+  using difference_type   = difference_type_t<I>;
+  using iterator_category = iterator_category_t<I>;
+
+  explicit move_iterator(I i)
+    : iter(i)
+  { }
+
+  template<ConvertibleTo<I> J>
+  move_iterator(move_iterator<J> const&);
+
+  template<ConvertibleTo<I> J>
+  move_iterator& operator=(move_iterator<J> const&);
+
+  I base() const { return iter; }
+
+  reference operator*() const;
+
+  move_iterator& operator++();
+  move_iterator& operator--() requires BidirectionalIterator<I>();
+  move_iterator operator++(int);
+  move_iterator operator--(int) requires BidirectionalIterator<I>();
+
+  move_iterator& operator+=(difference_type) requires RandomAccessIterator<I>();
+  move_iterator& operator-=(difference_type) requires RandomAccessIterator<I>();
+
+  reference operator[](difference_type n) const requires RandomAccessIterator<I>();
+
+  I iter;
+};
+
+template<InputIterator I>
+template<ConvertibleTo<I> J>
+inline
+move_iterator<I>::move_iterator(move_iterator<J> const& i)
+  : iter(i)
+{ }
+
+template<InputIterator I>
+template<ConvertibleTo<I> J>
+inline auto
+move_iterator<I>::operator=(move_iterator<J> const& i) -> move_iterator&
+{
+  iter = i.iter;
+  return *this;
+}
+
+template<InputIterator I>
+inline auto
+move_iterator<I>::operator*() const -> reference
+{
+  return static_cast<reference>(*iter);
+}
+
+template<InputIterator I>
+inline auto
+move_iterator<I>::operator++() -> move_iterator&
+{
+  ++iter;
+  return *this;
+}
+
+template<InputIterator I>
+inline auto
+move_iterator<I>::operator--() -> move_iterator&
+  requires BidirectionalIterator<I>()
+{
+  --iter;
+  return *this;
+}
+
+template<InputIterator I>
+inline auto
+move_iterator<I>::operator++(int) -> move_iterator
+{
+  move_iterator tmp = *this;
+  ++iter;
+  return tmp;
+}
+
+template<InputIterator I>
+inline auto
+move_iterator<I>::operator--(int) -> move_iterator
+  requires BidirectionalIterator<I>()
+{
+  move_iterator tmp = *this;
+  --iter;
+  return tmp;
+}
+
+template<InputIterator I>
+inline auto
+move_iterator<I>::operator+=(difference_type n) -> move_iterator&
+  requires RandomAccessIterator<I>()
+{
+  iter += n;
+  return *this;
+}
+
+template<InputIterator I>
+inline auto
+move_iterator<I>::operator-=(difference_type n) -> move_iterator&
+  requires RandomAccessIterator<I>()
+{
+  iter -= n;
+  return *this;
+}
+
+template<InputIterator I>
+inline auto
+move_iterator<I>::operator[](difference_type n) const -> reference
+  requires RandomAccessIterator<I>()
+{
+  return *(iter + n);
+}
+
+
+// Random access arithmetic
+
+template<RandomAccessIterator I>
+inline move_iterator<I>
+operator+(move_iterator<I> const& i, difference_type_t<I> n)
+{
+  move_iterator<I> tmp = i;
+  return tmp += n;
+}
+
+template<RandomAccessIterator I>
+inline move_iterator<I>
+operator+(difference_type_t<I> n, move_iterator<I> const& i)
+{
+  return i + n;
+}
+
+template<RandomAccessIterator I>
+inline move_iterator<I>
+operator-(move_iterator<I> const& i, difference_type_t<I> n)
+{
+  move_iterator<I> tmp = i;
+  return tmp -= n;
+}
+
+
+
+
+
 
 
 } // namespace stl

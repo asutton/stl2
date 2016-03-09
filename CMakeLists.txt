@@ -14,7 +14,8 @@ add_library(stl
   std/concepts.cpp
   std/utility.cpp
   std/functional.cpp
-  std/iterator.cpp)
+  std/iterator.cpp
+  std/algorithm.cpp)
 
 
 include_directories(.)
