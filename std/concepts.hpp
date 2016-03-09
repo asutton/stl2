@@ -119,6 +119,18 @@ concept bool Boolean()
 }
 
 
+template<typename T>
+concept bool EqualityComparable()
+{
+  return requires (T a, T b) {
+    { a == b } -> Boolean;
+    { a != b } -> Boolean;
+  };
+}
+
+
+// FIXME: Rename this EqualityComparable and ensure that T and
+// U are also equality comparble. But skip the common type bits.
 template<typename T, typename U>
 concept bool WeaklyEqualityComparable()
 {
@@ -127,16 +139,6 @@ concept bool WeaklyEqualityComparable()
     { b == a } -> Boolean;
     { a != b } -> Boolean;
     { b != a } -> Boolean;
-  };
-}
-
-
-template<typename T>
-concept bool EqualityComparable()
-{
-  return requires (T a, T b) {
-    { a == b } -> Boolean;
-    { a != b } -> Boolean;
   };
 }
 
@@ -392,6 +394,118 @@ concept bool StrictWeakOrder()
 {
   return Relation<R, T, U>();
 }
+
+
+// General properties
+
+
+template<typename T>
+concept bool
+has_nested_value_type()
+{
+  return requires { typename T::value_type; }
+      && Object<typename T::value_type>();
+}
+
+template<typename T>
+concept bool
+has_nested_element_type()
+{
+  return requires { typename T::element_type; }
+      && Object<typename T::element_type>();
+}
+
+
+// Value type
+
+template<typename T>
+struct value_type;
+
+template<typename T>
+struct value_type<T*>
+{
+  using type = T;
+};
+
+template<typename T>
+struct value_type<T const*>
+{
+  using type = T;
+};
+
+template<typename T>
+  requires has_nested_value_type<T>()
+struct value_type<T>
+{
+  using type = typename T::value_type;
+};
+
+template<typename T>
+  requires has_nested_element_type<T>()
+struct value_type<T>
+{
+  using type = typename T::element_type;
+};
+
+template<typename T>
+using value_type_t = typename value_type<T>::type;
+
+
+// Reference type
+
+template<typename T>
+  requires requires (T t) { *t; }
+using reference_t = decltype(*std::declval<T>());
+
+
+// Pointer type
+//
+// NOTE: This isn't required... I don't really know what the TS
+// is doing with pointer types.
+
+template<typename T>
+  requires requires (T t) { &*t; }
+using pointer_t = decltype(&*std::declval<T>());
+
+
+// Difference type
+
+template<typename T>
+struct difference_type;
+
+template<typename T>
+struct difference_type<T*>
+{
+  using type = std::ptrdiff_t;
+};
+
+template<typename T>
+  requires requires { typename T::difference_type; }
+struct difference_type<T*>
+{
+  using type = typename T::difference_type;
+};
+
+template<typename T>
+using difference_type_t = typename difference_type<T>::type;
+
+
+// Rvalue reference type
+
+template<typename T>
+using rvalue_reference_t = decltype(std::move(std::declval<reference_t<T>>()));
+
+
+// Iterator type
+
+template<typename T>
+using iterator_t = decltype(begin(std::declval<T&>()));
+
+
+// Sentinel type
+
+template<typename T>
+using sentinel_t = decltype(end(std::declval<T&>()));
 
 
 } // namespace stl

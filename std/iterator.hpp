@@ -12,101 +12,6 @@
 namespace stl
 {
 
-template<typename T>
-concept bool has_nested_value_type()
-{
-  return requires { typename T::value_type; }
-      && Object<typename T::value_type>();
-}
-
-template<typename T>
-concept bool has_nested_element_type()
-{
-  return requires { typename T::element_type; }
-      && Object<typename T::element_type>();
-}
-
-
-// Value type
-
-template<typename T>
-struct value_type;
-
-template<typename T>
-struct value_type<T*>
-{
-  using type = T;
-};
-
-template<typename T>
-struct value_type<T const*>
-{
-  using type = T;
-};
-
-template<typename T>
-  requires has_nested_value_type<T>()
-struct value_type<T>
-{
-  using type = typename T::value_type;
-};
-
-template<typename T>
-  requires has_nested_element_type<T>()
-struct value_type<T>
-{
-  using type = typename T::element_type;
-};
-
-template<typename T>
-using value_type_t = typename value_type<T>::type;
-
-
-// Reference type
-
-template<typename T>
-  requires requires (T t) { *t; }
-using reference_t = decltype(*std::declval<T>());
-
-
-// Pointer type
-//
-// NOTE: This isn't required... I don't really know what the TS
-// is doing with pointer types.
-
-template<typename T>
-  requires requires (T t) { &*t; }
-using pointer_t = decltype(&*std::declval<T>());
-
-
-// Rvalue reference type
-
-template<typename T>
-using rvalue_reference_t = decltype(std::move(std::declval<reference_t<T>>()));
-
-
-// Difference type
-
-template<typename T>
-struct difference_type;
-
-template<typename T>
-struct difference_type<T*>
-{
-  using type = std::ptrdiff_t;
-};
-
-template<typename T>
-  requires requires { typename T::difference_type; }
-struct difference_type<T*>
-{
-  using type = typename T::difference_type;
-};
-
-template<typename T>
-using difference_type_t = typename difference_type<T>::type;
-
-
 // Iterator category
 
 template<typename T>
@@ -740,35 +645,6 @@ make_reverse_iterator(I const& iter)
 
 
 // Insertion concepts
-//
-// NOTE: T is generally expected to be either X const& or X&&.
-
-template<typename T>
-struct iterator;
-
-template<typename T>
-struct iterator<T[]>
-{
-  using type = T*;
-};
-
-template<typename T, std::size_t N>
-struct iterator<T[N]>
-{
-  using type = T*;
-};
-
-template<typename T>
-  requires requires { T::iterator; }
-struct iterator<T[]>
-{
-  using type = typename T::iterator;
-};
-
-template<typename T>
-using iterator_t = typename iterator<T>::type;
-
-
 template<typename C, typename T>
 concept bool BackInsertable()
 {
@@ -1058,7 +934,6 @@ move_iterator<I>::operator[](difference_type n) const -> reference
   return *(iter + n);
 }
 
-
 // Random access arithmetic
 
 template<RandomAccessIterator I>
@@ -1085,9 +960,393 @@ operator-(move_iterator<I> const& i, difference_type_t<I> n)
 }
 
 
+// Common iterator
+//
+// TODO: Implement me.
 
 
 
+// Default sentinel
+
+struct default_sentinel
+{ };
+
+constexpr bool
+operator==(default_sentinel, default_sentinel) noexcept
+{
+  return true;
+}
+
+constexpr bool
+operator!=(default_sentinel, default_sentinel) noexcept
+{
+  return false;
+}
+
+constexpr bool
+operator<(default_sentinel, default_sentinel) noexcept
+{
+  return false;
+}
+
+constexpr bool
+operator>(default_sentinel, default_sentinel) noexcept
+{
+  return false;
+}
+
+constexpr bool
+operator<=(default_sentinel, default_sentinel) noexcept
+{
+  return true;
+}
+
+constexpr bool
+operator>=(default_sentinel, default_sentinel) noexcept
+{
+  return true;
+}
+
+constexpr std::ptrdiff_t
+operator-(default_sentinel, default_sentinel) noexcept
+{
+  return 0;
+}
+
+
+// Unreachable sentinel
+//
+// NOTE: I changed the name to conform with default sentinel.
+
+struct unreachable_sentinel { };
+
+constexpr bool
+operator==(Iterator const&, unreachable_sentinel)
+{
+  return false;
+}
+
+constexpr bool
+operator==(unreachable_sentinel, Iterator const&)
+{
+  return false;
+}
+
+constexpr bool
+operator!=(Iterator const&, unreachable_sentinel)
+{
+  return true;
+}
+
+constexpr bool
+operator!=(unreachable_sentinel, Iterator const&)
+{
+  return true;
+}
+
+
+// Counted iterator
+
+template<Iterator I>
+struct counted_iterator
+{
+  using iterator_type     = I;
+  using value_type        = value_type_t<I>;
+  using reference         = reference_t<I>;
+  using difference_type   = difference_type_t<I>;
+  using iterator_category = iterator_category_t<I>;
+
+  counted_iterator();
+  counted_iterator(I, difference_type);
+
+  template<ConvertibleTo<I> J>
+  counted_iterator(counted_iterator<J> const&);
+
+  template<ConvertibleTo<I> J>
+  counted_iterator& operator=(counted_iterator<J> const&);
+
+  I base() const { return iter; }
+  difference_type count() const { return count; }
+  reference operator*() const { return *iter; }
+
+  counted_iterator& operator++();
+  counted_iterator& operator--() requires BidirectionalIterator<I>();
+  counted_iterator operator++(int);
+  counted_iterator operator--(int) requires BidirectionalIterator<I>();
+
+  counted_iterator& operator+=(difference_type) requires RandomAccessIterator<I>();
+  counted_iterator& operator-=(difference_type) requires RandomAccessIterator<I>();
+
+  reference operator[](difference_type) requires RandomAccessIterator<I>();
+
+  I iter;
+  difference_type cnt;
+};
+
+template<Iterator I>
+inline
+counted_iterator<I>::counted_iterator()
+  : iter(), cnt()
+{ }
+
+template<Iterator I>
+inline
+counted_iterator<I>::counted_iterator(I i, difference_type n)
+  : iter(i), cnt(n)
+{ }
+
+template<Iterator I>
+template<ConvertibleTo<I> J>
+inline
+counted_iterator<I>::counted_iterator(counted_iterator<J> const& i)
+  : iter(i.iter), cnt(i.cnt)
+{ }
+
+template<Iterator I>
+template<ConvertibleTo<I> J>
+inline auto
+counted_iterator<I>::operator=(counted_iterator<J> const& i) -> counted_iterator&
+{
+  iter = i.iter;
+  cnt = i.cnt;
+}
+
+template<Iterator I>
+inline auto
+counted_iterator<I>::operator++() -> counted_iterator&
+{
+  ++iter;
+  --cnt;
+  return *this;
+}
+
+template<Iterator I>
+inline auto
+counted_iterator<I>::operator--() -> counted_iterator&
+  requires BidirectionalIterator<I>()
+{
+  --iter;
+  ++cnt;
+}
+
+template<Iterator I>
+inline auto
+counted_iterator<I>::operator++(int) -> counted_iterator
+{
+  counted_iterator tmp = *this;
+  ++iter;
+  --cnt;
+  return *this;
+}
+
+template<Iterator I>
+inline auto
+counted_iterator<I>::operator--(int) -> counted_iterator
+  requires BidirectionalIterator<I>()
+{
+  counted_iterator tmp = *this;
+  --iter;
+  ++cnt;
+  return *this;
+}
+
+template<Iterator I>
+inline auto
+counted_iterator<I>::operator+=(difference_type n) -> counted_iterator&
+  requires RandomAccessIterator<I>()
+{
+  iter += n;
+  cnt -= n;
+  return *this;
+}
+
+template<Iterator I>
+inline auto
+counted_iterator<I>::operator-=(difference_type n) -> counted_iterator&
+  requires RandomAccessIterator<I>()
+{
+  iter -= n;
+  cnt += n;
+  return *this;
+}
+
+template<Iterator I>
+inline auto
+counted_iterator<I>::operator[](difference_type n) -> reference
+  requires RandomAccessIterator<I>()
+{
+  return *(iter + n);
+}
+
+// Arithmetic
+template<RandomAccessIterator I>
+inline counted_iterator<I>
+operator+(counted_iterator<I> i, difference_type_t<I> n)
+{
+  return counted_iterator<I>(i.iter + n, i.cnt - n);
+}
+
+template<RandomAccessIterator I>
+inline counted_iterator<I>
+operator+(difference_type_t<I> n, counted_iterator<I> i)
+{
+  return counted_iterator<I>(i.iter + n, i.cnt - n);
+}
+
+template<RandomAccessIterator I>
+inline counted_iterator<I>
+operator-(counted_iterator<I> i, difference_type_t<I> n)
+{
+  return counted_iterator<I>(i.iter - n, i.cnt + n);
+}
+
+// Equality
+
+// NOTE: I don't the specification is correct for this.
+template<typename I1, typename I2>
+  requires EqualityComparable<I1, I2>()
+inline bool
+operator==(counted_iterator<I1> i, counted_iterator<I2> j)
+{
+  return i.iter == j.iter;
+}
+
+template<typename I1, typename I2>
+  requires EqualityComparable<I1, I2>()
+inline bool
+operator!=(counted_iterator<I1> i, counted_iterator<I2> j)
+{
+  return i.iter != j.iter;
+}
+
+template<typename I>
+inline bool
+operator==(counted_iterator<I> i, default_sentinel)
+{
+  return i.cnt == 0;
+}
+
+template<typename I>
+inline bool
+operator==(default_sentinel, counted_iterator<I> i)
+{
+  return i.cnt == 0;
+}
+
+template<typename I>
+inline bool
+operator!=(counted_iterator<I> i, default_sentinel)
+{
+  return i.cnt != 0;
+}
+
+template<typename I>
+inline bool
+operator!=(default_sentinel, counted_iterator<I> i)
+{
+  return i.cnt != 0;
+}
+
+// Ordering
+
+// FIXME: I don't think that the requirements on ordering are correct.
+template<RandomAccessIterator I1, RandomAccessIterator I2>
+  requires TotallyOrdered<I1, I2>()
+inline bool
+operator<(counted_iterator<I1> i, counted_iterator<I2> j)
+{
+  return i.iter < j.iter;
+}
+
+template<RandomAccessIterator I1, RandomAccessIterator I2>
+  requires TotallyOrdered<I1, I2>()
+inline bool
+operator>(counted_iterator<I1> i, counted_iterator<I2> j)
+{
+  return i.iter > j.iter;
+}
+
+template<RandomAccessIterator I1, RandomAccessIterator I2>
+  requires TotallyOrdered<I1, I2>()
+inline bool
+operator<=(counted_iterator<I1> i, counted_iterator<I2> j)
+{
+  return i.iter <= j.iter;
+}
+
+template<RandomAccessIterator I1, RandomAccessIterator I2>
+  requires TotallyOrdered<I1, I2>()
+inline bool
+operator>=(counted_iterator<I1> i, counted_iterator<I2> j)
+{
+  return i.iter >= j.iter;
+}
+
+template<typename I>
+inline bool
+operator<(counted_iterator<I> i, default_sentinel)
+{
+  return i.cnt != 0;
+}
+
+template<typename I>
+inline bool
+operator<(default_sentinel, counted_iterator<I> i)
+{
+  return false;
+}
+
+template<typename I>
+inline bool
+operator>(counted_iterator<I> i, default_sentinel s)
+{
+  return false;
+}
+
+template<typename I>
+inline bool
+operator>(default_sentinel s, counted_iterator<I> i)
+{
+  return i.cnt != 0;
+}
+
+template<typename I>
+inline bool
+operator<=(counted_iterator<I> i, default_sentinel)
+{
+  return true;
+}
+
+template<typename I>
+inline bool
+operator<=(default_sentinel, counted_iterator<I> i)
+{
+  return i.cnt == 0;
+}
+
+template<typename I>
+inline bool
+operator>=(counted_iterator<I> i, default_sentinel)
+{
+  return i.cnt == 0;
+}
+
+template<typename I>
+inline bool
+operator>=(default_sentinel, counted_iterator<I> i)
+{
+  return true;
+}
+
+
+// Dangling wrapper
+//
+// TODO: Implement me.
+
+
+// Stream iterators
+//
+// TODO: Implement me.
 
 
 } // namespace stl

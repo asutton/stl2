@@ -15,6 +15,7 @@ add_library(stl
   std/utility.cpp
   std/functional.cpp
   std/iterator.cpp
+  std/range.cpp
   std/algorithm.cpp)
 
 
