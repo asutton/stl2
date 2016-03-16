@@ -216,7 +216,7 @@ concept bool Assignable()
 {
   return Common<T, U>() && requires (T& a, U&& b)
   {
-    { std::forward<T>(a) = std::forward<U>(b) } -> T&; // FIXME: SameAs<T&>
+    { std::forward<T>(a) = std::forward<U>(b) } -> T&; // FIXME: == T&
   };
 }
 
@@ -481,7 +481,7 @@ struct difference_type<T*>
 
 template<typename T>
   requires requires { typename T::difference_type; }
-struct difference_type<T*>
+struct difference_type<T>
 {
   using type = typename T::difference_type;
 };

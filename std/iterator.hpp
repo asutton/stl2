@@ -14,13 +14,19 @@ namespace stl
 
 // Iterator category
 
+using std::input_iterator_tag;
+using std::output_iterator_tag;
+using std::forward_iterator_tag;
+using std::bidirectional_iterator_tag;
+using std::random_access_iterator_tag;
+
 template<typename T>
 struct iterator_category;
 
 template<typename T>
 struct iterator_category<T*>
 {
-  using type = std::random_access_iterator_tag;
+  using type = random_access_iterator_tag;
 };
 
 template<typename T>
@@ -60,9 +66,13 @@ concept bool WeaklyIncrementable()
   return Semiregular<I>() && requires (I i) {
     typename difference_type_t<I>;
     requires SignedIntegral<difference_type_t<I>>();
-    { ++i } -> SameAs<I&>;
+    { ++i } -> I&; // FIXME: == I&
     i++;
   };
+
+  // return Semiregular<I>() && requires (I i) {
+  //   typename difference_type_t<I>;
+  // };
 }
 
 
@@ -121,7 +131,7 @@ concept bool InputIterator()
     Readable<I>() &&
     requires(I i, const I ci) {
       typename iterator_category_t<I>;
-      requires DerivedFrom<iterator_category_t<I>, std::input_iterator_tag>();
+      requires DerivedFrom<iterator_category_t<I>, input_iterator_tag>();
       { *ci } -> const value_type_t<I>&;
       { i++ } -> Readable;
       { *i++ } -> const value_type_t<I>&;
@@ -142,8 +152,8 @@ concept bool ForwardIterator()
 {
   return InputIterator<I>() &&
     Incrementable<I>() &&
-    DerivedFrom<iterator_category_t<I>, std::forward_iterator_tag>() &&
-    Sentinel<I, I>(); // FIXME: This cannot be right.
+    DerivedFrom<iterator_category_t<I>, forward_iterator_tag>() &&
+    Sentinel<I, I>();
 };
 
 
@@ -151,9 +161,9 @@ template<typename I>
 concept bool BidirectionalIterator()
 {
   return ForwardIterator<I>() &&
-    DerivedFrom<iterator_category_t<I>, std::bidirectional_iterator_tag>() &&
+    DerivedFrom<iterator_category_t<I>, bidirectional_iterator_tag>() &&
     requires (I i) {
-      { --i } -> SameAs<I&>;
+      { --i } -> I&; // FIXME: == I&
       { i-- } -> SameAs<I>;
     };
 }
@@ -164,15 +174,15 @@ concept bool RandomAccessIterator()
 {
   return BidirectionalIterator<I>() &&
     TotallyOrdered<I>() &&
-    SizedSentinel<I>() && // FIXME: Not if iterators aren't sentinels.
-    DerivedFrom<iterator_category_t<I>, std::random_access_iterator_tag>() &&
+    SizedSentinel<I, I>() && // FIXME: Not if iterators aren't sentinels.
+    DerivedFrom<iterator_category_t<I>, random_access_iterator_tag>() &&
     requires (I i, I j, difference_type_t<I> n) {
-      { i += n } -> SameAs<I&>;
+      { i += n } -> I&; // FIXME: == I&
       { j + n } -> SameAs<I>;
       { n + j } -> SameAs<I>;
-      { i -= n } -> SameAs<I&>;
+      { i -= n } -> I&; // FIXME: I&
       { j - n } -> SameAs<I>;
-      { j[n] } -> SameAs<reference_t<I>>;
+      { j[n] } -> reference_t<I>;
     };
 }
 
