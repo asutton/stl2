@@ -107,7 +107,7 @@ concept bool Sentinel()
 }
 
 
-template<typename T>
+template<typename S, typename I>
 constexpr bool disable_sized_sentinel = false;
 
 
@@ -358,10 +358,13 @@ concept bool Mergeable()
 }
 
 
-template<typename I, typename R = less<>, typename P = identity_fn>
+// FIXME: Non-conforming.
+template<typename I>
 concept bool Sortable()
 {
-  return Permutable<I>() && IndirectStrictWeakOrder<R, projected<I, P>>();
+  return Permutable<I>() &&
+    RandomAccessIterator<I>() &&
+    TotallyOrdered<value_type_t<I>>();
 }
 
 // Advance
