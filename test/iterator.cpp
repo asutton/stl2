@@ -1,6 +1,5 @@
 
 #include <std/iterator.hpp>
-#include <std/range.hpp> // FIXME: Wrong test.
 
 #include <forward_list>
 #include <list>
@@ -25,14 +24,6 @@ static_assert(test_bidirectional_iterator<biter>());
 static_assert(test_random_access_iterator<riter>());
 
 
-// FIXME: Remove this.
-template<stl::Range R>
-  requires stl::Sortable<stl::iterator_t<R>>()
-void sort(R const& range) { }
-
-
 int main()
 {
-  std::list<int> lst;
-  sort(lst);
 }
